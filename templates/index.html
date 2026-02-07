@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sanskrit OCR &amp; Transliteration</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .container {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 2rem;
+      max-width: 560px;
+      width: 100%;
+      align-self: flex-start;
+    }
+    h1 {
+      font-size: 1.4rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+      font-size: 0.9rem;
+    }
+    .help {
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 0.4rem;
+    }
+    input[type="file"],
+    input[type="number"],
+    input[type="password"],
+    select {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+      background: #fff;
+    }
+    input[type="file"] { padding: 0.45rem; }
+    .row {
+      display: flex;
+      gap: 1rem;
+    }
+    .row > div { flex: 1; }
+    .flash {
+      padding: 0.75rem 1rem;
+      border-radius: 5px;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+    .flash.error {
+      background: #fdecea;
+      color: #b71c1c;
+      border: 1px solid #f5c6cb;
+    }
+    button {
+      width: 100%;
+      padding: 0.7rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #fff;
+      background: #1a73e8;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    button:hover { background: #1565c0; }
+    button:disabled {
+      background: #94bef5;
+      cursor: wait;
+    }
+    .spinner {
+      display: none;
+      text-align: center;
+      margin-top: 0.8rem;
+      font-size: 0.9rem;
+      color: #555;
+    }
+    .spinner::before {
+      content: "";
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid #999;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Sanskrit OCR &amp; Transliteration</h1>
+
+  <div class="flash error" id="errorBox" style="display:none;"></div>
+
+  <form method="post" enctype="multipart/form-data" id="ocrForm">
+    <!-- PDF Upload -->
+    <label for="pdf">PDF File</label>
+    <input type="file" id="pdf" name="pdf" accept=".pdf" required>
+
+    <!-- Page Range -->
+    <div class="row">
+      <div>
+        <label for="start_page">Start Page</label>
+        <input type="number" id="start_page" name="start_page" min="1" value="1" required>
+      </div>
+      <div>
+        <label for="end_page">End Page</label>
+        <input type="number" id="end_page" name="end_page" min="1" value="1" required>
+      </div>
+    </div>
+
+    <!-- Language & Script -->
+    <div class="row">
+      <div>
+        <label for="language">Language</label>
+        <select id="language" name="language">
+          <option value="sa" selected>Sanskrit (sa)</option>
+        </select>
+      </div>
+      <div>
+        <label for="script">Script</label>
+        <select id="script" name="script">
+          <option value="Deva">Devanagari (Deva)</option>
+          <option value="Beng">Bengali (Beng)</option>
+          <option value="Mlym">Malayalam (Mlym)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Output Scheme -->
+    <label for="output_scheme">Output Transliteration</label>
+    <select id="output_scheme" name="output_scheme">
+      <option value="IAST">IAST</option>
+      <option value="Kolkata">Kolkata</option>
+      <option value="ITRANS">ITRANS</option>
+      <option value="Harvard-Kyoto">Harvard-Kyoto</option>
+      <option value="SLP">SLP</option>
+    </select>
+
+    <!-- API Key -->
+    <label for="api_key">Google Cloud API Key</label>
+    <p class="help">Your key is sent directly to Google and is not stored.</p>
+    <input type="password" id="api_key" name="api_key" placeholder="AIza..." required>
+
+    <button type="submit" id="submitBtn">Run OCR &amp; Transliterate</button>
+    <div class="spinner" id="spinner">Processing — this may take a moment&hellip;</div>
+  </form>
+</div>
+
+<script>
+  document.getElementById("ocrForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var btn = document.getElementById("submitBtn");
+    var spinner = document.getElementById("spinner");
+    var errorBox = document.getElementById("errorBox");
+
+    btn.disabled = true;
+    btn.textContent = "Processing\u2026";
+    spinner.style.display = "block";
+    errorBox.style.display = "none";
+
+    var formData = new FormData(this);
+
+    fetch("/", { method: "POST", body: formData })
+      .then(function (resp) {
+        if (resp.ok) {
+          var disposition = resp.headers.get("Content-Disposition") || "";
+          var match = disposition.match(/filename="?(.+?)"?$/);
+          var filename = match ? match[1] : "output.txt";
+          return resp.blob().then(function (blob) {
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          });
+        } else {
+          return resp.json().then(function (data) {
+            errorBox.textContent = data.error || "An unknown error occurred.";
+            errorBox.style.display = "block";
+          });
+        }
+      })
+      .catch(function () {
+        errorBox.textContent = "A network error occurred. Please check your connection and try again.";
+        errorBox.style.display = "block";
+      })
+      .finally(function () {
+        btn.disabled = false;
+        btn.innerHTML = "Run OCR &amp; Transliterate";
+        spinner.style.display = "none";
+      });
+  });
+</script>
+</body>
+</html>
